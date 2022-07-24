@@ -2,6 +2,9 @@
 Hi {{ name }},  
 Welcome to VOIDOC!
 Please click on the link to confirm your registration,
-http://{{ domain }}{% url 'activate' uid=uid token=token %}
+<form action="http://{{ domain }}{% url 'activate' uid=uid token=token %}">
+    <input type="submit" value="Activation Link" />
+</form>
+
 This link will expire within 2 hours.
 {% endautoescape %}  
