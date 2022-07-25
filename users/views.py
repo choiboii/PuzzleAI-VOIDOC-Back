@@ -1,3 +1,4 @@
+import email
 import json
 
 from django.views           import View
@@ -48,14 +49,14 @@ class SignUpView(View, Validation):
                 'uid': urlsafe_base64_encode(force_bytes(user.id)),  
                 'token': default_token_generator.make_token(user),  
             })
-            email = mail.EmailMessage(
+            email1 = mail.EmailMessage(
                 'Welcome, ' + name + ', to VOIDOC!',
                 message,
                 'noreply.voidoc@gmail.com',
                 [email],
                 connection=connection,
             )
-            connection.send_messages([email])
+            connection.send_messages([email1])
             connection.close()
 
             return JsonResponse({'message' : 'SUCCESS'}, status=201)
@@ -145,23 +146,74 @@ class CheckDuplicateEmailView(View, Validation):
             return JsonResponse({'message' : 'KEY_ERROR'}, status = 400)
 
 class PasswordChangeView(View, Validation):
-    def post(self, request):
-        data            = json.loads(request.body)
-        email           = data['email']
-        old_password    = data['old_password']
-        new_password    = data['new_password']
+    def post(self, request, uid, token):
         try:
-            user = CustomUser.objects.get(email=email)
-            user.check_password(old_password)
-            self.validate_password(new_password)
-            user.set_password(new_password)
+            id = force_str(urlsafe_base64_decode(uid))
+            user = CustomUser.objects.get(pk=id)  
+        except(TypeError, ValueError, OverflowError, CustomUser.DoesNotExist):  
+            user = None
+        if user is not None and default_token_generator.check_token(user, token):              
+            data            = json.loads(request.body)
+            password1    = data['password']
+            password2    = data['repeat_password']
+            try:
+                self.validate_password(password1)
+                if(password1 != password2):
+                    return JsonResponse({'message' : "PASSWORDS_DO_NOT_MATCH"}, status=400)
+                user.set_password(password1)
+            except ValidationError as e:
+                return JsonResponse({'message' : e.message}, status=400)
             user.save()
+
+            connection = mail.get_connection()
+            connection.open() 
+            message = render_to_string('reset_password_email.html', { 'name': user.name })
+            email1 = mail.EmailMessage(
+                'VOIDOC password changed successfully!',
+                message,
+                'noreply.voidoc@gmail.com',
+                [user.email],
+                connection=connection,
+            )
+            connection.send_messages([email1])
+            connection.close()
+
             return JsonResponse({
                 'message'     : 'PASSWORD_CHANGED_SUCCESSFULLY',
                 'email'       : user.email,
-                'new_password': new_password,
+                'new_password': password1,
                 }, status=201) 
+        else:
+            return JsonResponse({'message' : 'INVALID_AUTHORIZATION_LINK'}, status=400)
+
+class ForgotPasswordView(View):
+    def post(self, request):
+        data    = json.loads(request.body)
+        email   = data['email']
+        try:
+            user = CustomUser.objects.all().get(email=email)
+            uid = urlsafe_base64_encode(force_bytes(user.id))      
+            token = default_token_generator.make_token(user)
+
+            connection = mail.get_connection()
+            connection.open() 
+            current_site = get_current_site(request)  
+            message = render_to_string('forgot_password_email.html', { 
+                'name'  : user.name,
+                'domain': current_site.domain,
+                'uid'   : uid,
+                'token' : token
+            })
+            email1 = mail.EmailMessage(
+                'VOIDOC password change request',
+                message,
+                'noreply.voidoc@gmail.com',
+                [user.email],
+                connection=connection,
+            )
+            connection.send_messages([email1])
+            connection.close()
+
+            return JsonResponse({'message' : 'EMAIL_SENT_SUCCESSFULLY'}, status=200)
         except ObjectDoesNotExist:
             return JsonResponse({'message' : 'NO_USER_EXISTS_WITH_THIS_EMAIL'}, status=404)
-        except ValidationError as e:
-            return JsonResponse({'message' : e.message}, status=400)
