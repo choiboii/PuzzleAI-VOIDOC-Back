@@ -76,9 +76,12 @@ class ActivateUserView(View, Validation):
         except(TypeError, ValueError, OverflowError, CustomUser.DoesNotExist):  
             user = None
         if user is not None and default_token_generator.check_token(user, token):  
-            user.is_active = True  
-            user.save()  
-            return JsonResponse({'message' : 'SUCCESS_USER_ACTIVATED'}, status=200)  
+            if(user.is_active == True):
+                return JsonResponse({'message' : 'USER_ALREADY_ACTIVATED'}, status=400)
+            else:
+                user.is_active == True   
+                user.save()  
+                return JsonResponse({'message' : 'SUCCESS_USER_ACTIVATED'}, status=200)  
         else:  
             return JsonResponse({'message' : 'INVALID_AUTHORIZATION_LINK'}, status=400)    
 
