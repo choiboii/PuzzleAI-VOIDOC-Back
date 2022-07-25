@@ -1,10 +1,8 @@
 {% autoescape off %}  
 Hi {{ name }},  
 Welcome to VOIDOC!
-Please click on the link to confirm your registration,
+Your email addressed has been registered with VOIDOC, and in order to login and use the app's features, please click on the button below to activate your account:
 <form action="http://{{ domain }}{% url 'activate' uid=uid token=token %}">
     <input type="submit" value="Activation Link" />
 </form>
-
-This link will expire within 2 hours.
 {% endautoescape %}  
